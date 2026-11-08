@@ -3,8 +3,10 @@ pipeline {
 
     environment {
         COMPOSE_PROJECT_NAME = "resource-link-hub"
-        BACKEND_URL          = "http://localhost:5000/links"
-        FRONTEND_URL         = "http://localhost:8081"
+        // Gunakan host.docker.internal agar curl dari dalam Jenkins container
+        // bisa reach port yang ter-expose di host machine (Docker Desktop Windows/Mac)
+        BACKEND_URL          = "http://host.docker.internal:5000/links"
+        FRONTEND_URL         = "http://host.docker.internal:8081"
     }
 
     options {
@@ -109,11 +111,9 @@ pipeline {
             '''
         }
         failure {
-            echo '❌ Pipeline FAILED — rolling back to previous state...'
-            sh '''
-                docker compose down --remove-orphans || true
-                echo "⚠️  Services stopped. Check logs: docker compose logs"
-            '''
+            echo '❌ Pipeline FAILED — lihat log untuk detail.'
+            echo '⚠️  Container TIDAK dihapus otomatis. Cek manual: docker compose ps'
+            sh 'docker compose ps || true'
         }
         always {
             echo '📋 Final container status:'
