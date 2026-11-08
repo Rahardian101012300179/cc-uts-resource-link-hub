@@ -59,6 +59,13 @@ pipeline {
         // ── Stage 4: Automated Deployment ────────────────────────────────
         stage('Automated Deployment') {
             steps {
+                echo '🚀 Stopping any conflicting containers before deploy...'
+                sh '''
+                    # Hapus container lama dengan nama yang sama (jika ada)
+                    docker rm -f resource-link-backend resource-link-frontend 2>/dev/null || true
+                    echo "✅ Old containers cleared"
+                '''
+
                 echo '🚀 Deploying all services with Docker Compose...'
                 sh '''
                     docker compose up -d --remove-orphans

@@ -48,11 +48,10 @@ services:
 # ── Named Volume ─────────────────────────────────────────────────────────────
 volumes:
   link-hub-data:
-    name: link-hub-data
+    external: true
 
 # ── Bridge Network ────────────────────────────────────────────────────────────
 networks:
   app-net:
-    name: app-net
-    driver: bridge
+    external: true
 
