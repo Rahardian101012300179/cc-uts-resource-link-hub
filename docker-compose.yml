@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Resource Link Hub - Docker Compose
+# Services: backend (Python API) + frontend (Nginx)
+# Network:  app-net (bridge)
+# Volume:   link-hub-data (persistent JSON store)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Backend: Pure Python REST API ─────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resource-link-backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - link-hub-data:/var/lib/backend_data
+    networks:
+      - app-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/links')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── Frontend: Nginx Static + Reverse Proxy ────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: nginx:1.27-alpine
+    container_name: resource-link-frontend
+    ports:
+      - "8081:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app-net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+# ── Named Volume ─────────────────────────────────────────────────────────────
+volumes:
+  link-hub-data:
+    name: link-hub-data
+
+# ── Bridge Network ────────────────────────────────────────────────────────────
+networks:
+  app-net:
+    name: app-net
+    driver: bridge
+
