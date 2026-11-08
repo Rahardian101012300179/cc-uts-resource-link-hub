@@ -2,11 +2,10 @@ pipeline {
     agent any
 
     environment {
-        COMPOSE_PROJECT_NAME = "resource-link-hub"
-        // Gunakan host.docker.internal agar curl dari dalam Jenkins container
-        // bisa reach port yang ter-expose di host machine (Docker Desktop Windows/Mac)
-        BACKEND_URL          = "http://host.docker.internal:5000/links"
-        FRONTEND_URL         = "http://host.docker.internal:8081"
+        // Path absolut folder proyek di Windows Host.
+        // Dibutuhkan agar Bind Mount Nginx (index.html & nginx.conf) berhasil
+        // saat docker compose dieksekusi dari dalam kontainer Jenkins.
+        HOST_PROJECT_PATH = 'D:/DOWN+DOC/TELKOM/SMST 7/CC/UTS/project'
     }
 
     options {
@@ -30,19 +29,14 @@ pipeline {
         stage('Syntax Check') {
             steps {
                 echo '🔍 Running syntax validation...'
-
-                // Validate Python source
                 sh '''
-                    echo "[1/2] Python syntax check → app.py"
+                    echo "[1/2] Python syntax check -> app.py"
                     python3 -m py_compile app.py
                     echo "      ✅ app.py passed"
-                '''
 
-                // Validate Docker Compose configuration
-                sh '''
                     echo "[2/2] Docker Compose config validation"
                     docker compose config -q
-                    echo "      ✅ docker-compose.yml is valid"
+                    echo "      ✅ docker-compose.yml passed"
                 '''
             }
         }
@@ -50,29 +44,23 @@ pipeline {
         // ── Stage 3: Build Image ──────────────────────────────────────────
         stage('Build Image') {
             steps {
-                echo '🐳 Building backend Docker image (no cache)...'
-                sh '''
-                    docker compose build --no-cache backend
-                    echo "✅ Backend image built successfully"
-                '''
+                echo '🐳 Building Backend Docker Image...'
+                sh 'docker compose build --no-cache backend'
+                echo '✅ Backend image built successfully'
             }
         }
 
         // ── Stage 4: Automated Deployment ────────────────────────────────
         stage('Automated Deployment') {
             steps {
-                echo '🚀 Stopping any conflicting containers before deploy...'
+                echo '🚀 Deploying Fullstack Application...'
                 sh '''
                     # Hapus container lama dengan nama yang sama (jika ada)
-                    docker rm -f resource-link-backend resource-link-frontend 2>/dev/null || true
-                    echo "✅ Old containers cleared"
-                '''
+                    docker rm -f resource-link-frontend resource-link-backend 2>/dev/null || true
 
-                echo '🚀 Deploying all services with Docker Compose...'
-                sh '''
+                    # Deploy semua service
                     docker compose up -d --remove-orphans
-                    echo "✅ Services deployed:"
-                    docker compose ps
+                    echo "✅ Services deployed successfully"
                 '''
             }
         }
@@ -80,19 +68,27 @@ pipeline {
         // ── Stage 5: Health Check ─────────────────────────────────────────
         stage('Health Check') {
             steps {
-                echo '🏥 Waiting 5 seconds for services to initialize...'
-                sh 'sleep 5'
-
-                echo '🔎 Checking backend API (port 5000)...'
+                echo '🏥 Verifying Containers & Endpoints...'
                 sh '''
-                    curl -f --silent --show-error --max-time 10 ${BACKEND_URL}
-                    echo "\n✅ Backend is healthy — GET /links responded OK"
-                '''
+                    sleep 5
 
-                echo '🔎 Checking frontend (port 8081)...'
-                sh '''
-                    curl -f --silent --show-error --max-time 10 ${FRONTEND_URL}
-                    echo "\n✅ Frontend is healthy — Nginx responded OK"
+                    # Hubungkan Jenkins ke app-net agar bisa reach container by name
+                    docker network connect app-net jenkins-server 2>/dev/null || true
+
+                    echo "--- Container Status ---"
+                    docker compose ps
+
+                    echo "--- Checking Backend API (/links) ---"
+                    curl -sf http://resource-link-backend:5000/links \
+                      || curl -sf http://host.docker.internal:5000/links
+                    echo "✅ Backend is healthy"
+
+                    echo "--- Checking Frontend Nginx ---"
+                    curl -sf http://resource-link-frontend:80 > /dev/null \
+                      || curl -sf http://host.docker.internal:8081 > /dev/null
+                    echo "✅ Frontend is healthy"
+
+                    echo "✅ All services are UP and HEALTHY!"
                 '''
             }
         }
@@ -100,25 +96,15 @@ pipeline {
 
     // ── Post Actions ──────────────────────────────────────────────────────
     post {
-        success {
-            echo '''
-╔══════════════════════════════════════════════╗
-║  ✅  PIPELINE SUCCEEDED                      ║
-║  Resource Link Hub deployed and healthy!     ║
-║  UI  → http://localhost:8081                 ║
-║  API → http://localhost:5000/links           ║
-╚══════════════════════════════════════════════╝
-            '''
-        }
-        failure {
-            echo '❌ Pipeline FAILED — lihat log untuk detail.'
-            echo '⚠️  Container TIDAK dihapus otomatis. Cek manual: docker compose ps'
-            sh 'docker compose ps || true'
-        }
         always {
             echo '📋 Final container status:'
             sh 'docker compose ps || true'
         }
+        success {
+            echo '🎉 Pipeline SUCCEEDED! Application is live at http://localhost:8081'
+        }
+        failure {
+            echo '❌ Pipeline FAILED — lihat log di atas untuk detail.'
+        }
     }
 }
-
