@@ -3,6 +3,12 @@
 > **Studi Kasus 9 — Repositori Tautan Modul Praktikum**  
 > Cloud Computing · Semester 7 · Telkom University
 
+Group A :
+1. Rahardian Rafi Satria Hutama (101012300179)
+2. M. Rahim A. Malik M.         (101012330099)
+3. Fajar Hafizh Zakarya         (101012300412)
+4. Mochamad Torie Prasetya      (101012330386)
+
 Aplikasi web full-stack untuk menyimpan dan mengelola tautan referensi modul praktikum, dibangun dengan **Python murni** (tanpa framework), **Nginx**, dan **Docker Compose**, serta terintegrasi dengan **Jenkins CI/CD Pipeline**.
 
 ---
